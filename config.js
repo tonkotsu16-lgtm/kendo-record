@@ -1,3 +1,3 @@
 // ★スプレッドシート側でデプロイしたウェブアプリのURLを '' の間に貼り付けてください
 // （https://script.google.com/macros/s/……/exec の形のURL）
-const GAS_URL = 'https://docs.google.com/spreadsheets/d/1N1VmQvVPXI11ghwj0dTqcflGhIdPsEHzBjV4VYuyE5U/edit?gid=0#gid=0';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzf19fUy8Efq7WRgQluTxp8f47rEZSRze7uiwqRUCo7Qpp8kj0o42jYK_Xt-1_sdb_0/exec';
