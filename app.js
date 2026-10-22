@@ -198,14 +198,63 @@
     };
     $('statsBody').innerHTML = names.map(nm => {
       const mine = recs.filter(r => r.name === nm);
-      const w = mine.filter(r => kind(r) === 'win').length;
-      const l = mine.filter(r => kind(r) === 'lose').length;
-      const d = mine.length - w - l;
-      const rate = (w + l) ? Math.round(w / (w + l) * 100) + '%' : '-';
-      return `<tr><td class="n">${esc(nm)}</td><td>${mine.length}</td><td>${w}</td><td>${l}</td><td>${d}</td><td>${rate}</td></tr>` +
+      const { w, l, d, rate } = wld(mine);
+      return `<tr><td class="n"><button type="button" data-n="${esc(nm)}">${esc(nm)}</button></td><td>${mine.length}</td><td>${w}</td><td>${l}</td><td>${d}</td><td>${rate}</td></tr>` +
         (mine.length ? `<tr><td colspan="6" class="tech">取った技：${count(mine, '自分')}<br>取られた技：${count(mine, '相手')}</td></tr>` : '');
     }).join('') || '<tr><td colspan="6" class="empty">まだ記録がありません</td></tr>';
+    $('statsBody').querySelectorAll('button[data-n]').forEach(b => b.onclick = () => {
+      $('sName').value = b.dataset.n; renderDetail(); window.scrollTo(0, 0);
+    });
+
+    const cur = $('sName').value;
+    $('sName').innerHTML = '<option value="">全員の一覧</option>' +
+      names.map(n => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    renderDetail();
   }
+
+  function wld(list) {
+    const w = list.filter(r => kind(r) === 'win').length;
+    const l = list.filter(r => kind(r) === 'lose').length;
+    return { w, l, d: list.length - w - l, rate: (w + l) ? Math.round(w / (w + l) * 100) + '%' : '-' };
+  }
+
+  // 個人の詳細：技ごとの割合
+  function renderDetail() {
+    const nm = $('sName').value;
+    $('detail').classList.toggle('hidden', !nm);
+    $('overview').classList.toggle('hidden', !!nm);
+    if (!nm) return;
+    const mine = allRecords().filter(r => r.name === nm);
+    const { w, l, d, rate } = wld(mine);
+
+    const block = (who, title, color) => {
+      const c = {}; TECHS.forEach(([, full]) => c[full] = 0);
+      mine.forEach(r => [r.p1, r.p2, r.p3].forEach(p => {
+        if (p && p.startsWith(who)) { const t = TECHS.find(([, f]) => p.endsWith(f)); if (t) c[t[1]]++; }
+      }));
+      const total = Object.values(c).reduce((a, b) => a + b, 0);
+      const rows = TECHS.map(([, f]) => [f, c[f]]).sort((a, b) => b[1] - a[1]);
+      const max = rows[0][1];
+      const body = total ? rows.map(([f, n]) => {
+        const pct = Math.round(n / total * 100);
+        return `<div class="bar ${n && n === max ? 'top' : ''}"><span class="lb">${f}</span>
+          <span class="tr"><span class="fl" style="width:${pct}%;background:${color}"></span></span>
+          <span class="vl">${pct}% <small>${n}本</small></span></div>`;
+      }).join('') + `<p class="note">いちばん多いのは<b style="color:${color}">${rows.filter(r => r[1] === max).map(r => r[0]).join('・')}</b>（${Math.round(max / total * 100)}%）</p>`
+        : '<div class="empty" style="padding:12px 0">まだ記録がありません</div>';
+      return `<div class="card"><div class="dh"><h3 style="color:${color}">${title}</h3><small>合計 ${total}本</small></div>${body}</div>`;
+    };
+
+    $('detail').innerHTML = `
+      <div class="card"><div class="sum">
+        <div><b>${mine.length}</b><span>試合</span></div><div><b style="color:var(--win)">${w}</b><span>勝</span></div>
+        <div><b style="color:var(--lose)">${l}</b><span>負</span></div><div><b>${d}</b><span>分</span></div>
+        <div><b>${rate}</b><span>勝率</span></div></div></div>
+      ${block('自分', '取った技', 'var(--win)')}
+      ${block('相手', '取られた技', 'var(--lose)')}
+      <p class="hint">割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
+  }
+  $('sName').onchange = () => { renderDetail(); window.scrollTo(0, 0); };
 
   // ---- 状態表示 ----
   function renderStatus() {

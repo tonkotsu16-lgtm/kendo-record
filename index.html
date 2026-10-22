@@ -88,6 +88,22 @@ th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:center}
 th{font-size:12px;color:var(--sub);font-weight:700}
 td.n{text-align:left;font-weight:700}
 .tech{font-size:12px;color:var(--sub);text-align:left}
+td.n button{background:none;border:none;padding:0;font:inherit;font-weight:700;color:var(--ai);text-decoration:underline;text-underline-offset:3px}
+.sum{display:grid;grid-template-columns:repeat(5,1fr);text-align:center;gap:4px}
+.sum b{display:block;font-size:22px;line-height:1.2}
+.sum span{font-size:11px;color:var(--sub)}
+.dh{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px}
+.dh h3{margin:0;font-size:15px}
+.dh small{color:var(--sub);font-size:12px}
+.bar{display:grid;grid-template-columns:40px 1fr 74px;gap:8px;align-items:center;margin:7px 0;font-size:14px}
+.bar .lb{font-weight:700}
+.bar .tr{background:#efe9dd;border-radius:4px;height:16px;overflow:hidden}
+.bar .tr,.bar .fl{display:block}
+.bar .fl{height:100%;border-radius:4px}
+.bar .vl{text-align:right;font-variant-numeric:tabular-nums}
+.bar .vl small{color:var(--sub)}
+.bar.top .lb,.bar.top .vl{font-weight:700}
+.note{font-size:13px;margin:10px 0 0;padding-top:8px;border-top:1px dashed var(--line)}
 .lock{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .lock .card{width:100%;max-width:380px;text-align:center}
 .lock h2{margin:4px 0 6px;font-size:20px;color:var(--ai)}
@@ -175,13 +191,17 @@ td.n{text-align:left;font-weight:700}
 
   <!-- 成績 -->
   <section id="tab-stats" class="hidden">
+    <select id="sName" style="margin-bottom:10px"></select>
+    <div id="detail" class="hidden"></div>
+    <div id="overview">
     <div class="card" style="padding:10px">
       <table>
         <thead><tr><th style="text-align:left">名前</th><th>試合</th><th>勝</th><th>負</th><th>分</th><th>勝率</th></tr></thead>
         <tbody id="statsBody"></tbody>
       </table>
     </div>
-    <p class="hint">「取った技」「取られた技」はメ・コ・ド・ツ・反（相手の反則による一本）の数です。</p>
+    <p class="hint">名前を押すか、上で部員を選ぶと、技ごとの割合が見られます。「反」は反則による一本です。</p>
+    </div>
   </section>
 </main>
 
