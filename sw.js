@@ -1,9 +1,9 @@
 // オフラインでもアプリ画面を開けるようにするための仕組み
 // アプリを更新したときは VERSION の数字を1つ上げてください
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'kendo-record-' + VERSION;
 const FILES = ['./', './index.html', './app.js', './config.js', './manifest.json',
-               './icons/icon-192.png', './icons/icon-512.png'];
+               './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
