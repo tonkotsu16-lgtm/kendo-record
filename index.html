@@ -104,6 +104,37 @@ td.n button{background:none;border:none;padding:0;font:inherit;font-weight:700;c
 .bar .vl small{color:var(--sub)}
 .bar.top .lb,.bar.top .vl{font-weight:700}
 .note{font-size:13px;margin:10px 0 0;padding-top:8px;border-top:1px dashed var(--line)}
+/* スコアシート */
+.sheetcard{padding:10px}
+.ss{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+.ss th,.ss td{border:1px solid #9a948a;padding:3px 2px;text-align:center;vertical-align:middle;word-break:break-all}
+.ss th{background:#efe9dd;color:var(--ink);font-size:12px;font-weight:700;padding:4px 1px}
+.ss col.lab{width:34px} .ss col.win{width:40px}
+.ss td.tm{font-weight:700;font-size:13px;line-height:1.15;padding:4px 0;background:#faf7f0;word-break:keep-all}
+.ss th.lh{font-size:9px;letter-spacing:-.05em;padding:4px 0}
+.ss td.nm{height:34px;font-weight:700}
+.ss td.mk{height:30px;font-size:15px;font-weight:700;line-height:1.1}
+.ss td.mk.me{color:var(--win)} .ss td.mk.op{color:var(--lose)}
+.ss td.mk.me{border-bottom:2px solid #22252b}
+.ss td.nm.w{background:#fdecea} .ss td.nm.l{background:#e9eef9}
+.ss td.ws{font-size:20px;font-weight:700}
+.ss td.ws small{display:block;font-size:10px;font-weight:400;color:var(--sub)}
+.ss .sel{background:#fff6d6 !important}
+.ss th.sel{background:#f3d77a !important}
+.ss td.click,.ss th.click{cursor:pointer}
+.ss .dim{color:#c3bdb2;font-weight:400}
+.ss .hl{outline:2px solid var(--ai);outline-offset:-2px}
+.fst{display:inline-block;border:1.5px solid currentColor;border-radius:50%;width:1.45em;height:1.45em;line-height:1.3em}
+.teamres{display:flex;justify-content:center;align-items:baseline;gap:10px;margin:10px 0 0;font-size:14px}
+.teamres b{font-size:18px}
+.teamres .r{font-weight:700;border-radius:6px;padding:2px 10px;color:#fff;background:var(--draw)}
+.teamres .r.win{background:var(--win)} .teamres .r.lose{background:var(--lose)}
+.stepbtns{display:flex;gap:8px;margin-top:14px}
+.stepbtns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 4px;font-size:14px;color:var(--ai);font-family:inherit}
+.stepbtns button:disabled{opacity:.35}
+.linkbtn{background:none;border:none;color:var(--sub);text-decoration:underline;font-size:12px;font-family:inherit;padding:4px}
+.rec.team{border-left-color:var(--ai);padding:10px}
+.rec.team.win{border-left-color:var(--win)} .rec.team.lose{border-left-color:var(--lose)}
 .lock{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .lock .card{width:100%;max-width:380px;text-align:center}
 .lock h2{margin:4px 0 6px;font-size:20px;color:var(--ai)}
@@ -140,23 +171,59 @@ td.n button{background:none;border:none;padding:0;font:inherit;font-weight:700;c
   <section id="tab-input">
     <div class="warnbox hidden" id="cfgWarn">config.js に送信先URLが設定されていません。入力はスマホ内に保存されますが、送信されません。</div>
     <div class="card">
-      <label class="f">日付<span class="req">必須</span></label>
-      <input type="date" id="fDate">
-
-      <label class="f">相手校<span class="req">必須</span></label>
-      <input type="text" id="fSchool" list="schoolList" placeholder="例：○○高校">
-      <datalist id="schoolList"></datalist>
-
       <label class="f">試合形式<span class="req">必須</span></label>
       <div class="chips" id="fFormat"></div>
 
-      <div id="posWrap" class="hidden">
-        <label class="f">ポジション</label>
-        <div class="chips" id="fPos"></div>
+      <label class="f">練習試合名</label>
+      <input type="text" id="fEvent" list="eventList" placeholder="例：秋季練習試合">
+      <datalist id="eventList"></datalist>
+
+      <label class="f">日付<span class="req">必須</span></label>
+      <input type="date" id="fDate">
+
+      <label class="f" id="schoolLabel">相手校<span class="req">必須</span></label>
+      <input type="text" id="fSchool" list="schoolList" placeholder="例：○○高校">
+      <datalist id="schoolList"></datalist>
+
+      <div id="teamNameWrap" class="hidden">
+        <label class="f">自チーム名<span class="req">必須</span></label>
+        <input type="text" id="fTeam" placeholder="例：四日市">
       </div>
-      <p class="hint">日付・相手校・試合形式は送信後も残るので、続けて入力できます。</p>
+      <p class="hint">試合名・日付・相手校は送信後も残るので、続けて入力できます。</p>
     </div>
 
+    <!-- 団体戦：スコアシート -->
+    <div id="teamWrap" class="hidden">
+      <div class="card sheetcard">
+        <div id="sheet"></div>
+        <p class="hint" style="margin-top:8px">列を押すと、そのポジションを入力できます。</p>
+      </div>
+
+      <div class="card" id="slotCard">
+        <div class="dh"><h3 id="slotTitle"></h3><small id="slotStep"></small></div>
+        <label class="f">自チームの選手</label>
+        <select id="tName"></select>
+        <label class="f">相手の選手</label>
+        <input type="text" id="tOpp" placeholder="名字のみ">
+        <label class="f">取った技・取られた技（順番に押す）</label>
+        <div class="pts" id="tPad"></div>
+        <div class="seq" id="tSeq"></div>
+        <label class="f">結果</label>
+        <div class="chips" id="tResult"></div>
+        <label class="f">試合時間</label>
+        <input type="text" id="tTime" placeholder="例：3:00／延長1:20">
+        <div class="stepbtns">
+          <button type="button" id="prevBtn">← 前のポジション</button>
+          <button type="button" id="nextBtn">次のポジション →</button>
+        </div>
+      </div>
+
+      <button class="primary" id="teamSaveBtn">団体戦をまとめて記録する</button>
+      <p class="hint" style="text-align:center">入力中の内容はスマホに一時保存されるので、途中でアプリを閉じても消えません。
+        <button type="button" class="linkbtn" id="teamClearBtn">入力中の内容を消す</button></p>
+    </div>
+
+    <div id="indivWrap">
     <div class="card">
       <label class="f">自分の名前<span class="req">必須</span></label>
       <select id="fName"></select>
@@ -178,6 +245,7 @@ td.n button{background:none;border:none;padding:0;font:inherit;font-weight:700;c
     </div>
 
     <button class="primary" id="saveBtn">記録する</button>
+    </div>
   </section>
 
   <!-- 結果一覧 -->

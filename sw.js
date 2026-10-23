@@ -1,6 +1,6 @@
 // オフラインでもアプリ画面を開けるようにするための仕組み
 // アプリを更新したときは VERSION の数字を1つ上げてください
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'kendo-record-' + VERSION;
 const FILES = ['./', './index.html', './app.js', './config.js', './manifest.json',
                './icon-192.png', './icon-512.png'];
