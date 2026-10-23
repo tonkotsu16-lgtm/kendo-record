@@ -7,6 +7,7 @@
   const FORMATS = ['個人戦', '団体戦'];
   const POSITIONS = ['先鋒', '次鋒', '中堅', '副将', '大将'];
   const TECHS = [['メ', 'メン'], ['コ', 'コテ'], ['ド', 'ドウ'], ['ツ', 'ツキ'], ['反', '反則']];
+  const PAD = TECHS.slice(0, 4);   // 反（反則による一本）は▲2回で自動的に入る
   const RESULTS = ['二本勝ち', '一本勝ち', '延長勝ち', '判定勝ち', '引き分け',
                    '判定負け', '延長負け', '一本負け', '二本負け'];
 
@@ -22,8 +23,8 @@
   let queue = load(LS.queue, []);               // 未送信の記録
   let cache = load(LS.cache, { members: [], records: [] });
   let format = load(LS.fmt, '個人戦');
-  let form = { points: [], result: '', resultManual: false };   // 個人戦
-  const emptySlot = () => ({ name: '', opp: '', points: [], result: '', manual: false, time: '' });
+  const emptySlot = () => ({ name: '', opp: '', points: [], fm: 0, fo: 0, log: [], result: '', manual: false, time: '' });
+  let form = emptySlot();   // 個人戦
   let team = load(LS.draft, null) || { cur: 0, slots: POSITIONS.map(emptySlot) };  // 団体戦
   let syncing = false;
   const saveDraft = () => save(LS.draft, team);
@@ -73,19 +74,56 @@
   }
   const resultCls = v => v.includes('勝') ? 'r-win' : v.includes('負') ? 'r-lose' : '';
 
-  function buildPad(el, onPress) {
-    const row = (who, cls) => `<div class="who" style="color:var(--${cls === 'me' ? 'win' : 'lose'})">${who}</div>` +
-      TECHS.map(([s, full]) => `<button type="button" class="${cls}" data-p="${who}：${full}">${s}</button>`).join('');
-    el.innerHTML = row('自分', 'me') + row('相手', 'op');
-    el.querySelectorAll('button').forEach(b => b.onclick = () => onPress(b.dataset.p));
+  // 1試合分の得点・反則（points：一本の順番、fm/fo：自分/相手の反則数、log：戻す用の操作履歴）
+  function norm(sc) {
+    sc.points = sc.points || []; sc.fm = +sc.fm || 0; sc.fo = +sc.fo || 0;
+    if (!Array.isArray(sc.log)) sc.log = sc.points.map(() => 'p');
+    return sc;
+  }
+  const reResult = sc => { if (!sc.manual) sc.result = sc.points.length ? autoResultOf(sc.points) : ''; };
+
+  function pressPoint(sc, p) {
+    norm(sc);
+    if (sc.points.length >= 3) { toast('一本は3つまでです'); return false; }
+    sc.points.push(p); sc.log.push('p'); reResult(sc); return true;
+  }
+  // 反則（▲）：2回目ごとに相手に一本（反則）が入る
+  function pressFoul(sc, me) {
+    norm(sc);
+    const k = me ? 'fm' : 'fo';
+    sc[k]++;
+    if (sc[k] % 2 === 0 && sc.points.length < 3) {
+      sc.points.push(me ? '相手：反則' : '自分：反則'); sc.log.push(k + '2');
+      toast(`${me ? '自分' : '相手'}の反則2回目：${me ? '相手' : '自分'}に一本（反）が入りました`);
+    } else sc.log.push(k);
+    reResult(sc); return true;
+  }
+  function undo(sc) {
+    norm(sc);
+    const last = sc.log.pop();
+    if (last === 'p') sc.points.pop();
+    else if (last) { sc[last.slice(0, 2)]--; if (last.endsWith('2')) sc.points.pop(); }
+    reResult(sc);
   }
 
-  function renderSeq(el, points, onUndo) {
-    const seq = points.map((p, i) =>
+  function buildPad(el, getSc, after) {
+    const row = (who, cls) => `<div class="who" style="color:var(--${cls === 'me' ? 'win' : 'lose'})">${who}</div>` +
+      PAD.map(([s, full]) => `<button type="button" class="${cls}" data-p="${who}：${full}">${s}</button>`).join('') +
+      `<button type="button" class="${cls} foul" data-f="${cls}">▲<small>反則</small></button>`;
+    el.innerHTML = row('自分', 'me') + row('相手', 'op');
+    el.querySelectorAll('button[data-p]').forEach(b => b.onclick = () => { if (pressPoint(getSc(), b.dataset.p)) after(); });
+    el.querySelectorAll('button[data-f]').forEach(b => b.onclick = () => { pressFoul(getSc(), b.dataset.f === 'me'); after(); });
+  }
+
+  const tri = n => '▲'.repeat(Math.max(0, +n || 0));
+  function renderSeq(el, sc, after) {
+    norm(sc);
+    const seq = sc.points.map((p, i) =>
       `<span class="p ${isMe(p) ? 'me' : 'op'}">${'①②③'[i]} ${isMe(p) ? '自' : '相'}${esc(short(p))}</span>`).join('');
-    el.innerHTML = (seq || '<span class="none">一本も入っていなければ押さなくてOK</span>') +
-      (points.length ? '<button type="button" class="undo">1つ戻す</button>' : '');
-    if (points.length) el.querySelector('.undo').onclick = onUndo;
+    const fouls = (sc.fm || sc.fo) ? `<span class="fl2">${sc.fm ? `<span style="color:var(--win)">自${tri(sc.fm)}</span>` : ''}${sc.fo ? `<span style="color:var(--lose)">相${tri(sc.fo)}</span>` : ''}</span>` : '';
+    el.innerHTML = (seq || fouls ? seq + fouls : '<span class="none">一本も入っていなければ押さなくてOK</span>') +
+      (sc.log.length ? '<button type="button" class="undo">1つ戻す</button>' : '');
+    if (sc.log.length) el.querySelector('.undo').onclick = () => { undo(sc); after(); };
   }
 
   // 得点から結果を自動で仮選択
@@ -108,15 +146,10 @@
 
   // ---- 個人戦フォーム ----
   function renderForm() {
-    chips($('fResult'), RESULTS, form.result, v => { form.result = v; form.resultManual = true; renderForm(); }, resultCls);
-    renderSeq($('seq'), form.points, () => {
-      form.points.pop(); if (!form.resultManual) form.result = form.points.length ? autoResultOf(form.points) : ''; renderForm();
-    });
+    chips($('fResult'), RESULTS, form.result, v => { form.result = v; form.manual = true; renderForm(); }, resultCls);
+    renderSeq($('seq'), form, renderForm);
   }
-  buildPad($('ptsPad'), p => {
-    if (form.points.length >= 3) { toast('一本は3つまでです'); return; }
-    form.points.push(p); if (!form.resultManual) form.result = autoResultOf(form.points); renderForm();
-  });
+  buildPad($('ptsPad'), () => form, renderForm);
 
   function memberOptions(sel, current, placeholder) {
     const members = cache.members || [];
@@ -164,6 +197,7 @@
       id: newId(), ...c, format: '個人戦', position: '', team: '', matchId: '',
       name: $('fName').value, opponent: $('fOpp').value.trim(),
       p1: form.points[0] || '', p2: form.points[1] || '', p3: form.points[2] || '',
+      foulMe: String(form.fm || 0), foulOp: String(form.fo || 0),
       result: form.result, time: $('fTime').value.trim()
     };
     if (!rec.name) miss.push('自分の名前');
@@ -171,7 +205,7 @@
     if (!rec.result) miss.push('結果');
     if (miss.length) { toast(miss.join('・') + 'を入力してください'); return; }
     save(LS.name, rec.name);
-    form = { points: [], result: '', resultManual: false };
+    form = emptySlot();
     $('fOpp').value = ''; $('fTime').value = '';
     enqueue([rec], '記録しました。');
   };
@@ -188,7 +222,8 @@
     const marks = (s, me) => {
       const pts = s.points || [];
       const html = pts.map((p, i) => isMe(p) === me
-        ? (i === 0 ? `<span class="fst">${esc(short(p))}</span>` : esc(short(p))) : '').join('');
+        ? (i === 0 ? `<span class="fst">${esc(short(p))}</span>` : esc(short(p))) : '').join('')
+        + (tri(me ? s.fm : s.fo) ? `<span class="tri">${tri(me ? s.fm : s.fo)}</span>` : '');
       if (html) return html;
       return me && s.name && s.result && kind(s) === 'draw' && !pts.length ? '<span class="dim">×</span>' : '';
     };
@@ -196,10 +231,16 @@
       const k = s.name ? kind(s) : '';
       const c = !s.result ? '' : me ? (k === 'win' ? 'w' : '') : (k === 'lose' ? 'l' : '');
       const v = me ? s.name : s.opp;
+      if (me && o.edit) {   // 自チームの選手名：押すとプルダウンで選べる
+        const members = cache.members || [];
+        const list = v && !members.includes(v) ? [...members, v] : members;
+        return { c: c + ' pick', v: `${v ? esc(v) : '<span class="dim">選手▼</span>'}<select class="cellsel" data-s="${o.idx}" aria-label="選手を選ぶ">
+          <option value="">（空欄）</option>${list.map(m => `<option ${m === v ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>` };
+      }
       return { c, v: v ? esc(v) : (o.edit ? '<span class="dim">―</span>' : '') };
     };
     const head = slots.map((_, i) => `<th class="${cls(i)}" data-i="${i}">${POSITIONS[i]}</th>`).join('');
-    const row = (fn, rc) => slots.map((s, i) => { const r = fn(s, i); return `<td class="${rc} ${r.c || ''} ${cls(i)}" data-i="${i}">${r.v}</td>`; }).join('');
+    const row = (fn, rc) => slots.map((s, i) => { o.idx = i; const r = fn(s, i); return `<td class="${rc} ${r.c || ''} ${cls(i)}" data-i="${i}">${r.v}</td>`; }).join('');
     const html = `<table class="ss"><colgroup><col class="lab">${slots.map(() => '<col>').join('')}<col class="win"></colgroup>
       <thead><tr><th class="lh">チーム</th>${head}<th>勝数</th></tr></thead><tbody>
       <tr><td class="tm" rowspan="2">${vert(o.team || '自チーム')}</td>${row(s => nameCell(s, true), 'nm')}<td class="ws" rowspan="2">${W}<small>${ipMe}本</small></td></tr>
@@ -218,7 +259,7 @@
   function slotsFromRecords(recs) {
     return POSITIONS.map(pos => {
       const r = recs.find(x => x.position === pos);
-      return r ? { name: r.name, opp: r.opponent, points: [r.p1, r.p2, r.p3].filter(Boolean), result: r.result, time: r.time }
+      return r ? { name: r.name, opp: r.opponent, points: [r.p1, r.p2, r.p3].filter(Boolean), fm: +r.foulMe || 0, fo: +r.foulOp || 0, result: r.result, time: r.time }
                : { name: '', opp: '', points: [], result: '' };
     });
   }
@@ -228,7 +269,13 @@
     const sh = sheetHTML(team.slots, { edit: true, sel: team.cur, team: $('fTeam').value.trim(), opp: $('fSchool').value.trim() });
     $('sheet').innerHTML = sh.html + (sh.any
       ? `<div class="teamres"><span>勝者数 <b>${sh.W}−${sh.L}</b></span><span>本数 <b>${sh.ipMe}−${sh.ipOp}</b></span><span class="r ${sh.tr}">${sh.label}</span></div>` : '');
-    $('sheet').querySelectorAll('[data-i]').forEach(c => c.onclick = () => { team.cur = +c.dataset.i; saveDraft(); renderTeam(); });
+    $('sheet').querySelectorAll('[data-i]').forEach(c => c.onclick = e => {
+      if (e.target.tagName === 'SELECT') return;
+      team.cur = +c.dataset.i; saveDraft(); renderTeam();
+    });
+    $('sheet').querySelectorAll('select.cellsel').forEach(sel => {
+      sel.onchange = () => { const i = +sel.dataset.s; team.slots[i].name = sel.value; team.cur = i; saveDraft(); renderTeam(); };
+    });
 
     const s = team.slots[team.cur];
     $('slotTitle').textContent = POSITIONS[team.cur] + 'の試合';
@@ -236,19 +283,13 @@
     memberOptions($('tName'), s.name, '選んでください（欠員なら空欄）');
     if (document.activeElement !== $('tOpp')) $('tOpp').value = s.opp;
     if (document.activeElement !== $('tTime')) $('tTime').value = s.time;
-    renderSeq($('tSeq'), s.points, () => {
-      s.points.pop(); if (!s.manual) s.result = s.points.length ? autoResultOf(s.points) : ''; saveDraft(); renderTeam();
-    });
+    renderSeq($('tSeq'), s, () => { saveDraft(); renderTeam(); });
     chips($('tResult'), RESULTS, s.result, v => { s.result = v; s.manual = true; saveDraft(); renderTeam(); }, resultCls);
     $('prevBtn').disabled = team.cur === 0;
     $('nextBtn').disabled = team.cur === POSITIONS.length - 1;
   }
 
-  buildPad($('tPad'), p => {
-    const s = team.slots[team.cur];
-    if (s.points.length >= 3) { toast('一本は3つまでです'); return; }
-    s.points.push(p); if (!s.manual) s.result = autoResultOf(s.points); saveDraft(); renderTeam();
-  });
+  buildPad($('tPad'), () => team.slots[team.cur], () => { saveDraft(); renderTeam(); });
   $('tName').onchange = () => { team.slots[team.cur].name = $('tName').value; saveDraft(); renderTeam(); };
   $('tOpp').oninput = () => { team.slots[team.cur].opp = $('tOpp').value; saveDraft(); renderTeam(); };
   $('tTime').oninput = () => { team.slots[team.cur].time = $('tTime').value; saveDraft(); };
@@ -274,7 +315,7 @@
       if (!s.opp.trim()) miss.push(POSITIONS[i] + 'の相手選手');
       if (!s.result) miss.push(POSITIONS[i] + 'の結果');
     });
-    const stray = team.slots.findIndex(s => !s.name && (s.opp || s.points.length));
+    const stray = team.slots.findIndex(s => !s.name && (s.opp || s.points.length || s.fm || s.fo));
     if (stray >= 0) miss.push(POSITIONS[stray] + 'の自チームの選手');
     if (miss.length) { toast(miss.join('・') + 'を入力してください'); return; }
     const names = used.map(x => x.s.name);
@@ -285,6 +326,7 @@
       id: newId(), ...c, format: '団体戦', position: POSITIONS[i], team: teamName, matchId,
       name: s.name, opponent: s.opp.trim(),
       p1: s.points[0] || '', p2: s.points[1] || '', p3: s.points[2] || '',
+      foulMe: String(s.fm || 0), foulOp: String(s.fo || 0),
       result: s.result, time: (s.time || '').trim()
     }));
     team = { cur: 0, slots: POSITIONS.map(emptySlot) }; saveDraft();
@@ -331,7 +373,9 @@
       }
       const r = it.rec;
       const pts = [r.p1, r.p2, r.p3].filter(Boolean)
-        .map(p => `<span class="mini ${isMe(p) ? 'me' : 'op'}">${esc(short(p))}</span>`).join('');
+        .map(p => `<span class="mini ${isMe(p) ? 'me' : 'op'}">${esc(short(p))}</span>`).join('')
+        + (+r.foulMe ? `<span class="hint" style="margin:0;color:var(--win)">自${tri(r.foulMe)}</span>` : '')
+        + (+r.foulOp ? `<span class="hint" style="margin:0;color:var(--lose)">相${tri(r.foulOp)}</span>` : '');
       const fmt = r.format + (r.position ? '・' + r.position : '');
       return `<div class="rec ${kind(r)}">
         <div class="top"><span>${esc(r.date)}　${esc(r.school)}${r.event ? '（' + esc(r.event) + '）' : ''}</span><span>${esc(fmt)}</span></div>
@@ -412,6 +456,9 @@
         <p class="hint" style="text-align:center;margin:8px 0 0">個人戦 ${mine.length - nTeam}試合・団体戦 ${nTeam}試合</p></div>
       ${block('自分', '取った技', 'var(--win)')}
       ${block('相手', '取られた技', 'var(--lose)')}
+      <div class="card"><div class="dh" style="margin:0"><h3>反則（▲）</h3>
+        <small>${(() => { const f = mine.reduce((a, r) => a + (+r.foulMe || 0), 0);
+          return `合計 <b style="font-size:16px;color:var(--ink)">${f}回</b>（1試合あたり ${mine.length ? (f / mine.length).toFixed(1) : 0}回）`; })()}</small></div></div>
       <p class="hint">割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
   }
   $('sName').onchange = () => { renderDetail(); window.scrollTo(0, 0); };
