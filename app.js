@@ -218,7 +218,7 @@
     const L = slots.filter(s => s.name && kind(s) === 'lose').length;
     const ipMe = slots.reduce((a, s) => a + (s.points || []).filter(isMe).length, 0);
     const ipOp = slots.reduce((a, s) => a + (s.points || []).filter(p => !isMe(p)).length, 0);
-    const cls = i => [o.edit ? 'click' : '', o.sel === i ? 'sel' : '', o.hl === i ? 'hl' : ''].join(' ');
+    const cls = i => [o.edit ? 'click' : '', o.sel === i ? 'sel' : '', (o.hl || []).includes(i) ? 'hl' : ''].join(' ');
     const marks = (s, me) => {
       const pts = s.points || [];
       const html = pts.map((p, i) => isMe(p) === me
@@ -318,8 +318,6 @@
     const stray = team.slots.findIndex(s => !s.name && (s.opp || s.points.length || s.fm || s.fo));
     if (stray >= 0) miss.push(POSITIONS[stray] + 'の自チームの選手');
     if (miss.length) { toast(miss.join('・') + 'を入力してください'); return; }
-    const names = used.map(x => x.s.name);
-    if (new Set(names).size !== names.length) { toast('同じ選手が2つのポジションに入っています'); return; }
 
     const matchId = newId();
     const recs = used.map(({ s, i }) => ({
@@ -362,7 +360,7 @@
       if (it.team) {
         const f = it.recs[0];
         const slots = slotsFromRecords(it.recs);
-        const hl = n ? slots.findIndex(x => x.name === n) : -1;
+        const hl = n ? slots.map((x, i) => x.name === n ? i : -1).filter(i => i >= 0) : [];   // 同じ選手が複数ポジションでも全部囲む
         const sh = sheetHTML(slots, { team: f.team || '自チーム', opp: f.school, hl });
         const pend = it.recs.some(r => r.pending);
         return `<div class="rec team ${sh.tr}">
