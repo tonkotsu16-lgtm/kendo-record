@@ -441,9 +441,23 @@
     return { w, l, d: list.length - w - l, rate: (w + l) ? Math.round(w / (w + l) * 100) + '%' : '-' };
   }
 
+  // 成績画面で選んでいる日付の記録だけを返す
+  function statsRecords() {
+    const d = $('sDate').value;
+    return allRecords().filter(r => !d || dateKey(r.date) === d);
+  }
+
   function renderStats() {
-    const recs = allRecords();
-    const names = [...new Set([...(cache.members || []), ...recs.map(r => r.name)])].filter(Boolean);
+    // 日付の選択肢（新しい順）
+    const allKeys = [...new Set(allRecords().map(r => dateKey(r.date)))].sort().reverse();
+    const curD = $('sDate').value;
+    $('sDate').innerHTML = '<option value="">すべての日付</option>' +
+      allKeys.map(k => `<option value="${esc(k)}" ${k === curD ? 'selected' : ''}>${esc(dateLabel(k))}</option>`).join('');
+
+    const recs = statsRecords();
+    // 日付を選んでいるときは、その日に試合をした部員だけを表示
+    const names = $('sDate').value ? [...new Set(recs.map(r => r.name))].filter(Boolean)
+      : [...new Set([...(cache.members || []), ...recs.map(r => r.name)])].filter(Boolean);
     const count = (list, who) => {
       const c = {}; TECHS.forEach(([s]) => c[s] = 0);
       list.forEach(r => [r.p1, r.p2, r.p3].forEach(p => { if (p && p.startsWith(who)) c[short(p)]++; }));
@@ -455,13 +469,15 @@
       return `<tr><td class="n"><button type="button" data-n="${esc(nm)}">${esc(nm)}</button></td><td>${mine.length}</td><td>${w}</td><td>${l}</td><td>${d}</td><td>${rate}</td></tr>` +
         (mine.length ? `<tr><td colspan="6" class="tech">取った技：${count(mine, '自分')}<br>取られた技：${count(mine, '相手')}</td></tr>` : '');
     }).join('') || '<tr><td colspan="6" class="empty">まだ記録がありません</td></tr>';
+    $('statsTitle').textContent = $('sDate').value ? dateLabel($('sDate').value) + 'の成績' : 'これまでの全成績';
     $('statsBody').querySelectorAll('button[data-n]').forEach(b => b.onclick = () => {
       $('sName').value = b.dataset.n; renderDetail(); window.scrollTo(0, 0);
     });
 
     const cur = $('sName').value;
+    const allNames = [...new Set([...(cache.members || []), ...allRecords().map(r => r.name)])].filter(Boolean);
     $('sName').innerHTML = '<option value="">全員の一覧</option>' +
-      names.map(n => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
+      allNames.map(n => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
     renderDetail();
   }
 
@@ -471,7 +487,8 @@
     $('detail').classList.toggle('hidden', !nm);
     $('overview').classList.toggle('hidden', !!nm);
     if (!nm) return;
-    const mine = allRecords().filter(r => r.name === nm);
+    const selD = $('sDate').value;
+    const mine = statsRecords().filter(r => r.name === nm);
     const { w, l, d, rate } = wld(mine);
     const nTeam = mine.filter(r => r.format === '団体戦').length;
 
@@ -493,7 +510,26 @@
       return `<div class="card"><div class="dh"><h3 style="color:${color}">${title}</h3><small>合計 ${total}本</small></div>${body}</div>`;
     };
 
+    // 日付別の成績（すべての日付を表示しているとき）
+    const byDay = {};
+    allRecords().filter(r => r.name === nm).forEach(r => (byDay[dateKey(r.date)] = byDay[dateKey(r.date)] || []).push(r));
+    const dayKeys = Object.keys(byDay).sort().reverse();
+    const dayCard = !selD && dayKeys.length ? `<div class="card"><div class="dh"><h3>日付別の成績</h3><small>押すとその日の内訳</small></div>
+      ${dayKeys.map(k => {
+        const list = byDay[k], x = wld(list);
+        const got = list.flatMap(r => [r.p1, r.p2, r.p3]).filter(p => p && isMe(p)).map(short).join('');
+        const lost = list.flatMap(r => [r.p1, r.p2, r.p3]).filter(p => p && !isMe(p)).map(short).join('');
+        const opps = [...new Set(list.map(r => r.school).filter(Boolean))].join('・');
+        return `<button type="button" class="dayrow" data-k="${esc(k)}">
+          <span class="dl"><b>${esc(dateLabel(k).replace(/^\d+年/, ''))}</b><small>${opps ? '対 ' + esc(opps) : ''}</small></span>
+          <span class="dw"><span style="color:var(--win)">${x.w}勝</span> <span style="color:var(--lose)">${x.l}敗</span> ${x.d}分</span>
+          <span class="dp">${got ? `<span style="color:var(--win)">${esc(got)}</span>` : ''}${got && lost ? ' / ' : ''}${lost ? `<span style="color:var(--lose)">${esc(lost)}</span>` : ''}${!got && !lost ? '<span class="dim">一本なし</span>' : ''}</span>
+        </button>`;
+      }).join('')}
+      <p class="hint" style="margin:6px 0 0">技：<span style="color:var(--win)">赤＝取った技</span>／<span style="color:var(--lose)">青＝取られた技</span></p></div>` : '';
+
     $('detail').innerHTML = `
+      ${selD ? `<div class="daybanner">${esc(dateLabel(selD))}の成績 <button type="button" class="linkbtn" id="allDaysBtn">すべての日付に戻す</button></div>` : ''}
       <div class="card"><div class="sum">
         <div><b>${mine.length}</b><span>試合</span></div><div><b style="color:var(--win)">${w}</b><span>勝</span></div>
         <div><b style="color:var(--lose)">${l}</b><span>負</span></div><div><b>${d}</b><span>分</span></div>
@@ -504,8 +540,12 @@
       <div class="card"><div class="dh" style="margin:0"><h3>反則（▲）</h3>
         <small>${(() => { const f = mine.reduce((a, r) => a + (+r.foulMe || 0), 0);
           return `合計 <b style="font-size:16px;color:var(--ink)">${f}回</b>（1試合あたり ${mine.length ? (f / mine.length).toFixed(1) : 0}回）`; })()}</small></div></div>
+      ${dayCard}
       <p class="hint">割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
+    $('detail').querySelectorAll('.dayrow').forEach(b => b.onclick = () => { $('sDate').value = b.dataset.k; renderStats(); window.scrollTo(0, 0); });
+    if ($('allDaysBtn')) $('allDaysBtn').onclick = () => { $('sDate').value = ''; renderStats(); window.scrollTo(0, 0); };
   }
+  $('sDate').onchange = () => { renderStats(); window.scrollTo(0, 0); };
   $('sName').onchange = () => { renderDetail(); window.scrollTo(0, 0); };
 
   // ---- 状態表示 ----

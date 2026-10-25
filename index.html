@@ -118,6 +118,15 @@ details.day .dt small{display:block;font-size:12px;opacity:.8;overflow:hidden;te
 details.day .ds{text-align:right;font-size:12px;line-height:1.35;white-space:nowrap}
 details.day .ds b{font-size:17px}
 details.day .ds span{background:#fff;border-radius:4px;padding:0 4px;font-weight:700}
+/* 成績の日付別 */
+.dayrow{display:grid;grid-template-columns:1fr auto;grid-template-areas:"dl dw" "dp dp";gap:2px 8px;width:100%;text-align:left;
+  background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-family:inherit;color:var(--ink)}
+.dayrow .dl{grid-area:dl;min-width:0} .dayrow .dl b{font-size:15px} .dayrow .dl small{color:var(--sub);font-size:12px;margin-left:6px}
+.dayrow .dw{grid-area:dw;font-size:13px;font-weight:700;white-space:nowrap}
+.dayrow .dp{grid-area:dp;font-size:14px;font-weight:700;letter-spacing:.05em}
+.dayrow .dim{color:var(--sub);font-weight:400;font-size:12px}
+.daybanner{background:var(--ai);color:#fff;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.daybanner .linkbtn{color:#fff;opacity:.85;white-space:nowrap}
 /* 反則 */
 .pts button.foul{font-size:15px;line-height:1.05;padding:6px 0}
 .pts button.foul small{display:block;font-size:10px;font-weight:400}
@@ -283,10 +292,14 @@ details.day .ds span{background:#fff;border-radius:4px;padding:0 4px;font-weight
 
   <!-- 成績 -->
   <section id="tab-stats" class="hidden">
-    <select id="sName" style="margin-bottom:10px"></select>
+    <div class="filters">
+      <select id="sDate"></select>
+      <select id="sName"></select>
+    </div>
     <div id="detail" class="hidden"></div>
     <div id="overview">
     <div class="card" style="padding:10px">
+      <div class="dh" style="margin:2px 2px 6px"><h3 id="statsTitle"></h3></div>
       <table>
         <thead><tr><th style="text-align:left">名前</th><th>試合</th><th>勝</th><th>負</th><th>分</th><th>勝率</th></tr></thead>
         <tbody id="statsBody"></tbody>
