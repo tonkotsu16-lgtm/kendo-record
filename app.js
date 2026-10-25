@@ -350,13 +350,47 @@
         groups[r.matchId].recs.push(r);
       } else items.push({ team: false, rec: r, date: r.date });
     });
+    items.forEach(it => it.key = dateKey(it.date));
+
+    // 日付の選択肢（新しい順）
+    const allKeys = [...new Set(items.map(it => it.key))].sort().reverse();
+    const curDate = $('lDate').value;
+    $('lDate').innerHTML = '<option value="">すべての日付</option>' +
+      allKeys.map(k => `<option value="${esc(k)}" ${k === curDate ? 'selected' : ''}>${esc(dateLabel(k))}</option>`).join('');
+    const d = $('lDate').value;
+
     const shown = items.filter(it => {
       const list = it.team ? it.recs : [it.rec];
-      return (!n || list.some(r => r.name === n)) && (!s || (list[0].school || '').includes(s));
-    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    if (!shown.length) { $('list').innerHTML = '<div class="empty">まだ記録がありません</div>'; return; }
+      return (!d || it.key === d) && (!n || list.some(r => r.name === n)) && (!s || (list[0].school || '').includes(s));
+    });
+    if (!shown.length) { $('list').innerHTML = '<div class="empty">該当する記録がありません</div>'; return; }
 
-    $('list').innerHTML = shown.map(it => {
+    // 日付ごとにまとめる
+    const byDate = {};
+    shown.forEach(it => (byDate[it.key] = byDate[it.key] || []).push(it));
+    const keys = Object.keys(byDate).sort().reverse();
+    if (!openDates) openDates = new Set([keys[0]]);   // 最初は最新の日付だけ開く
+
+    $('list').innerHTML = keys.map(k => {
+      const its = byDate[k];
+      // その日の個人の試合（団体戦の各ポジションを含む）。名前で絞り込み中はその選手の分だけ
+      const bouts = its.flatMap(it => it.team ? it.recs : [it.rec]).filter(r => !n || r.name === n);
+      const w = bouts.filter(r => kind(r) === 'win').length, l = bouts.filter(r => kind(r) === 'lose').length;
+      const opps = [...new Set(its.map(it => (it.team ? it.recs[0] : it.rec).school).filter(Boolean))];
+      const events = [...new Set(its.map(it => (it.team ? it.recs[0] : it.rec).event).filter(Boolean))];
+      const pend = bouts.some(r => r.pending);
+      const open = d || openDates.has(k);
+      return `<details class="day" data-k="${esc(k)}" ${open ? 'open' : ''}>
+        <summary><div class="dt"><b>${esc(dateLabel(k))}</b>${pend ? ' <span class="badge">未送信あり</span>' : ''}
+          <small>${esc(events.join('・'))}${events.length && opps.length ? '　' : ''}${opps.length ? '対 ' + esc(opps.join('・')) : ''}</small></div>
+          <div class="ds"><b>${bouts.length}</b>試合<br><span style="color:var(--win)">${w}勝</span> <span style="color:var(--lose)">${l}敗</span> ${bouts.length - w - l}分</div></summary>
+        ${its.map(itemHTML).join('')}</details>`;
+    }).join('');
+    $('list').querySelectorAll('details.day').forEach(el => el.addEventListener('toggle', () => {
+      if (el.open) openDates.add(el.dataset.k); else openDates.delete(el.dataset.k);
+    }));
+
+    function itemHTML(it) {
       if (it.team) {
         const f = it.recs[0];
         const slots = slotsFromRecords(it.recs);
@@ -364,7 +398,7 @@
         const sh = sheetHTML(slots, { team: f.team || '自チーム', opp: f.school, hl });
         const pend = it.recs.some(r => r.pending);
         return `<div class="rec team ${sh.tr}">
-          <div class="top"><span>${esc(f.date)}　${esc(f.event || '')}</span><span>団体戦${pend ? ' <span class="badge">未送信</span>' : ''}</span></div>
+          <div class="top"><span>${esc(f.event || '')}</span><span>団体戦${pend ? ' <span class="badge">未送信</span>' : ''}</span></div>
           <div class="vs" style="margin-bottom:6px">${esc(f.team)} <small>対</small> ${esc(f.school)}
             <span class="res" style="float:right;color:var(--${sh.tr === 'win' ? 'win' : sh.tr === 'lose' ? 'lose' : 'draw'})">${sh.W}−${sh.L} ${sh.label}</span></div>
           ${sh.html}</div>`;
@@ -376,14 +410,27 @@
         + (+r.foulOp ? `<span class="hint" style="margin:0;color:var(--lose)">相${tri(r.foulOp)}</span>` : '');
       const fmt = r.format + (r.position ? '・' + r.position : '');
       return `<div class="rec ${kind(r)}">
-        <div class="top"><span>${esc(r.date)}　${esc(r.school)}${r.event ? '（' + esc(r.event) + '）' : ''}</span><span>${esc(fmt)}</span></div>
+        <div class="top"><span>${esc(r.school)}${r.event ? '（' + esc(r.event) + '）' : ''}</span><span>${esc(fmt)}</span></div>
         <div class="vs">${esc(r.name)} <small>対</small> ${esc(r.opponent)}</div>
         <div class="bot">${pts || '<span class="hint" style="margin:0">一本なし</span>'}
           ${r.time ? `<span class="hint" style="margin:0 0 0 4px">${esc(r.time)}</span>` : ''}
           ${r.pending ? '<span class="badge">未送信</span>' : ''}
           <span class="res">${esc(r.result)}</span></div></div>`;
-    }).join('');
+    }
   }
+  let openDates = null;   // 開いている日付（画面を更新しても保つ）
+  // 日付を「2026/10/23」の形にそろえる
+  function dateKey(v) {
+    const m = String(v || '').match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+    return m ? `${m[1]}/${m[2].padStart(2, '0')}/${m[3].padStart(2, '0')}` : (v || '日付なし');
+  }
+  function dateLabel(k) {
+    const m = k.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    if (!m) return k;
+    const wd = '日月火水木金土'[new Date(+m[1], +m[2] - 1, +m[3]).getDay()];
+    return `${+m[1]}年${+m[2]}月${+m[3]}日（${wd}）`;
+  }
+  $('lDate').onchange = () => { renderList(); window.scrollTo(0, 0); };
   $('lName').onchange = renderList;
   $('lSchool').oninput = renderList;
 
