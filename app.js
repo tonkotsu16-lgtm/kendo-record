@@ -458,25 +458,16 @@
     // 日付を選んでいるときは、その日に試合をした部員だけを表示
     const names = $('sDate').value ? [...new Set(recs.map(r => r.name))].filter(Boolean)
       : [...new Set([...(cache.members || []), ...recs.map(r => r.name)])].filter(Boolean);
-    const count = (list, who) => {
-      const c = {}; TECHS.forEach(([s]) => c[s] = 0);
-      list.forEach(r => [r.p1, r.p2, r.p3].forEach(p => { if (p && p.startsWith(who)) c[short(p)]++; }));
-      return TECHS.map(([s]) => `${s}${c[s]}`).join(' ');
-    };
-    $('statsBody').innerHTML = names.map(nm => {
-      const mine = recs.filter(r => r.name === nm);
-      const { w, l, d, rate } = wld(mine);
-      return `<tr><td class="n"><button type="button" data-n="${esc(nm)}">${esc(nm)}</button></td><td>${mine.length}</td><td>${w}</td><td>${l}</td><td>${d}</td><td>${rate}</td></tr>` +
-        (mine.length ? `<tr><td colspan="6" class="tech">取った技：${count(mine, '自分')}<br>取られた技：${count(mine, '相手')}</td></tr>` : '');
-    }).join('') || '<tr><td colspan="6" class="empty">まだ記録がありません</td></tr>';
-    $('statsTitle').textContent = $('sDate').value ? dateLabel($('sDate').value) + 'の成績' : 'これまでの全成績';
-    $('statsBody').querySelectorAll('button[data-n]').forEach(b => b.onclick = () => {
+    // 名前を選ぶボタン（成績は名前を選んだときだけ表示）
+    $('nameGrid').innerHTML = names.map(nm => `<button type="button" class="namebtn" data-n="${esc(nm)}">${esc(nm)}</button>`).join('')
+      || '<div class="empty">まだ記録がありません</div>';
+    $('nameGrid').querySelectorAll('button[data-n]').forEach(b => b.onclick = () => {
       $('sName').value = b.dataset.n; renderDetail(); window.scrollTo(0, 0);
     });
 
     const cur = $('sName').value;
     const allNames = [...new Set([...(cache.members || []), ...allRecords().map(r => r.name)])].filter(Boolean);
-    $('sName').innerHTML = '<option value="">全員の一覧</option>' +
+    $('sName').innerHTML = '<option value="">名前を選ぶ</option>' +
       allNames.map(n => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
     renderDetail();
   }
@@ -529,6 +520,7 @@
       <p class="hint" style="margin:6px 0 0">技：<span style="color:var(--win)">赤＝取った技</span>／<span style="color:var(--lose)">青＝取られた技</span></p></div>` : '';
 
     $('detail').innerHTML = `
+      <button type="button" class="linkbtn" id="backNames" style="font-size:14px;margin:-4px 0 8px">← 名前の選択に戻る</button>
       ${selD ? `<div class="daybanner">${esc(dateLabel(selD))}の成績 <button type="button" class="linkbtn" id="allDaysBtn">すべての日付に戻す</button></div>` : ''}
       <div class="card"><div class="sum">
         <div><b>${mine.length}</b><span>試合</span></div><div><b style="color:var(--win)">${w}</b><span>勝</span></div>
@@ -543,6 +535,7 @@
       ${dayCard}
       <p class="hint">割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
     $('detail').querySelectorAll('.dayrow').forEach(b => b.onclick = () => { $('sDate').value = b.dataset.k; renderStats(); window.scrollTo(0, 0); });
+    $('backNames').onclick = () => { $('sName').value = ''; renderDetail(); window.scrollTo(0, 0); };
     if ($('allDaysBtn')) $('allDaysBtn').onclick = () => { $('sDate').value = ''; renderStats(); window.scrollTo(0, 0); };
   }
   $('sDate').onchange = () => { renderStats(); window.scrollTo(0, 0); };

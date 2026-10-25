@@ -127,6 +127,9 @@ details.day .ds span{background:#fff;border-radius:4px;padding:0 4px;font-weight
 .dayrow .dim{color:var(--sub);font-weight:400;font-size:12px}
 .daybanner{background:var(--ai);color:#fff;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .daybanner .linkbtn{color:#fff;opacity:.85;white-space:nowrap}
+.namegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.namebtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 4px;font-size:16px;font-weight:700;color:var(--ai);font-family:inherit}
+.namebtn:active{background:var(--ai);color:#fff}
 /* 反則 */
 .pts button.foul{font-size:15px;line-height:1.05;padding:6px 0}
 .pts button.foul small{display:block;font-size:10px;font-weight:400}
@@ -298,14 +301,11 @@ details.day .ds span{background:#fff;border-radius:4px;padding:0 4px;font-weight
     </div>
     <div id="detail" class="hidden"></div>
     <div id="overview">
-    <div class="card" style="padding:10px">
-      <div class="dh" style="margin:2px 2px 6px"><h3 id="statsTitle"></h3></div>
-      <table>
-        <thead><tr><th style="text-align:left">名前</th><th>試合</th><th>勝</th><th>負</th><th>分</th><th>勝率</th></tr></thead>
-        <tbody id="statsBody"></tbody>
-      </table>
-    </div>
-    <p class="hint">名前を押すか、上で部員を選ぶと、技ごとの割合が見られます。「反」は反則による一本です。</p>
+      <div class="card">
+        <div class="dh"><h3>名前を選んでください</h3></div>
+        <div class="namegrid" id="nameGrid"></div>
+      </div>
+      <p class="hint">名前を選ぶと、勝敗・技の割合・反則・日付別の成績が見られます。</p>
     </div>
   </section>
 </main>
