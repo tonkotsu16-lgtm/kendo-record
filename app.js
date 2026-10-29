@@ -438,7 +438,7 @@
   function wld(list) {
     const w = list.filter(r => kind(r) === 'win').length;
     const l = list.filter(r => kind(r) === 'lose').length;
-    return { w, l, d: list.length - w - l, rate: (w + l) ? Math.round(w / (w + l) * 100) + '%' : '-' };
+    return { w, l, d: list.length - w - l, rate: list.length ? Math.round(w / list.length * 100) + '%' : '-' };   // 勝率＝勝ち÷全試合（引き分けは負けと同じ扱い）
   }
 
   // 成績画面で選んでいる日付の記録だけを返す
@@ -533,7 +533,7 @@
         <small>${(() => { const f = mine.reduce((a, r) => a + (+r.foulMe || 0), 0);
           return `合計 <b style="font-size:16px;color:var(--ink)">${f}回</b>（1試合あたり ${mine.length ? (f / mine.length).toFixed(1) : 0}回）`; })()}</small></div></div>
       ${dayCard}
-      <p class="hint">割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
+      <p class="hint">勝率は「勝ち数÷全試合数」です（引き分けは負けと同じ扱い）。技の割合は、その部員が取った（取られた）一本の合計に対する割合です。</p>`;
     $('detail').querySelectorAll('.dayrow').forEach(b => b.onclick = () => { $('sDate').value = b.dataset.k; renderStats(); window.scrollTo(0, 0); });
     $('backNames').onclick = () => { $('sName').value = ''; renderDetail(); window.scrollTo(0, 0); };
     if ($('allDaysBtn')) $('allDaysBtn').onclick = () => { $('sDate').value = ''; renderStats(); window.scrollTo(0, 0); };
