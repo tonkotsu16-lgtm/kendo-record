@@ -7,7 +7,10 @@
   const FORMATS = ['個人戦', '団体戦'];
   const POSITIONS = ['先鋒', '次鋒', '中堅', '副将', '大将'];
   const TECHS = [['メ', 'メン'], ['コ', 'コテ'], ['ド', 'ドウ'], ['ツ', 'ツキ'], ['反', '反則']];
-  const PAD = TECHS.slice(0, 4);   // 反（反則による一本）は▲2回で自動的に入る
+  const PAD = TECHS.slice(0, 4);
+  // 技の種類（押さなくてもよい）
+  const KINDS = { 'しかけ技': ['飛び込み', '出ばな', '引き', '払い', '二段・連続'], '応じ技': ['すり上げ', '返し', '抜き', '打ち落とし'] };
+  const OJI = KINDS['応じ技'];   // 反（反則による一本）は▲2回で自動的に入る
   const RESULTS = ['二本勝ち', '一本勝ち', '延長勝ち', '判定勝ち', '引き分け',
                    '判定負け', '延長負け', '一本負け', '二本負け'];
 
@@ -78,6 +81,9 @@
   function norm(sc) {
     sc.points = sc.points || []; sc.fm = +sc.fm || 0; sc.fo = +sc.fo || 0;
     if (!Array.isArray(sc.log)) sc.log = sc.points.map(() => 'p');
+    if (!Array.isArray(sc.kinds)) sc.kinds = [];
+    while (sc.kinds.length < sc.points.length) sc.kinds.push('');
+    sc.kinds.length = sc.points.length;
     return sc;
   }
   const reResult = sc => { if (!sc.manual) sc.result = sc.points.length ? autoResultOf(sc.points) : ''; };
@@ -85,7 +91,7 @@
   function pressPoint(sc, p) {
     norm(sc);
     if (sc.points.length >= 3) { toast('一本は3つまでです'); return false; }
-    sc.points.push(p); sc.log.push('p'); reResult(sc); return true;
+    sc.points.push(p); sc.kinds.push(''); sc.log.push('p'); reResult(sc); return true;
   }
   // 反則（▲）：2回目ごとに相手に一本（反則）が入る
   function pressFoul(sc, me) {
@@ -93,7 +99,7 @@
     const k = me ? 'fm' : 'fo';
     sc[k]++;
     if (sc[k] % 2 === 0 && sc.points.length < 3) {
-      sc.points.push(me ? '相手：反則' : '自分：反則'); sc.log.push(k + '2');
+      sc.points.push(me ? '相手：反則' : '自分：反則'); sc.kinds.push(''); sc.log.push(k + '2');
       toast(`${me ? '自分' : '相手'}の反則2回目：${me ? '相手' : '自分'}に一本（反）が入りました`);
     } else sc.log.push(k);
     reResult(sc); return true;
@@ -101,8 +107,8 @@
   function undo(sc) {
     norm(sc);
     const last = sc.log.pop();
-    if (last === 'p') sc.points.pop();
-    else if (last) { sc[last.slice(0, 2)]--; if (last.endsWith('2')) sc.points.pop(); }
+    if (last === 'p') { sc.points.pop(); sc.kinds.pop(); }
+    else if (last) { sc[last.slice(0, 2)]--; if (last.endsWith('2')) { sc.points.pop(); sc.kinds.pop(); } }
     reResult(sc);
   }
 
@@ -119,11 +125,24 @@
   function renderSeq(el, sc, after) {
     norm(sc);
     const seq = sc.points.map((p, i) =>
-      `<span class="p ${isMe(p) ? 'me' : 'op'}">${'①②③'[i]} ${isMe(p) ? '自' : '相'}${esc(short(p))}</span>`).join('');
+      `<span class="p ${isMe(p) ? 'me' : 'op'}">${'①②③'[i]} ${isMe(p) ? '自' : '相'}${esc(short(p))}${sc.kinds[i] ? `<small>（${esc(sc.kinds[i])}）</small>` : ''}</span>`).join('');
     const fouls = (sc.fm || sc.fo) ? `<span class="fl2">${sc.fm ? `<span style="color:var(--win)">自${tri(sc.fm)}</span>` : ''}${sc.fo ? `<span style="color:var(--lose)">相${tri(sc.fo)}</span>` : ''}</span>` : '';
     el.innerHTML = (seq || fouls ? seq + fouls : '<span class="none">一本も入っていなければ押さなくてOK</span>') +
       (sc.log.length ? '<button type="button" class="undo">1つ戻す</button>' : '');
     if (sc.log.length) el.querySelector('.undo').onclick = () => { undo(sc); after(); };
+
+    // 最後に入れた一本の「技の種類」を選ぶ欄（反則による一本は対象外）
+    let box = el.nextElementSibling;
+    if (!box || !box.classList.contains('kindbox')) { box = document.createElement('div'); box.className = 'kindbox'; el.after(box); }
+    const li = sc.points.length - 1, lp = sc.points[li];
+    if (li < 0 || lp.endsWith('反則')) { box.innerHTML = ''; return; }
+    const full = TECHS.find(([, f]) => lp.endsWith(f))[1];
+    box.innerHTML = `<div class="kq">${'①②③'[li]} ${isMe(lp) ? '取った' : '取られた'}${full}は？<span>（押さなくてもOK）</span></div>` +
+      Object.entries(KINDS).map(([g, list]) => `<div class="kg">${g}</div><div class="subchips ${isMe(lp) ? 'me' : 'op'}">` +
+        list.map(k => `<button type="button" class="chip ${sc.kinds[li] === k ? 'on' : ''}" data-k="${esc(k)}">${esc(k)}</button>`).join('') + '</div>').join('');
+    box.querySelectorAll('button[data-k]').forEach(b => b.onclick = () => {
+      sc.kinds[li] = sc.kinds[li] === b.dataset.k ? '' : b.dataset.k; after();
+    });
   }
 
   // 得点から結果を自動で仮選択
@@ -197,6 +216,7 @@
       id: newId(), ...c, format: '個人戦', position: '', team: '', matchId: '',
       name: $('fName').value, opponent: $('fOpp').value.trim(),
       p1: form.points[0] || '', p2: form.points[1] || '', p3: form.points[2] || '',
+      k1: norm(form).kinds[0] || '', k2: form.kinds[1] || '', k3: form.kinds[2] || '',
       foulMe: String(form.fm || 0), foulOp: String(form.fo || 0),
       result: form.result, time: $('fTime').value.trim()
     };
@@ -324,6 +344,7 @@
       id: newId(), ...c, format: '団体戦', position: POSITIONS[i], team: teamName, matchId,
       name: s.name, opponent: s.opp.trim(),
       p1: s.points[0] || '', p2: s.points[1] || '', p3: s.points[2] || '',
+      k1: norm(s).kinds[0] || '', k2: s.kinds[1] || '', k3: s.kinds[2] || '',
       foulMe: String(s.fm || 0), foulOp: String(s.fo || 0),
       result: s.result, time: (s.time || '').trim()
     }));
@@ -472,6 +493,27 @@
     renderDetail();
   }
 
+  // 技の種類の内訳（種類が入っている一本だけを数える）
+  function kindCard(list, who, title, color, bg, showRatio) {
+    const items = [];
+    list.forEach(r => [[r.p1, r.k1], [r.p2, r.k2], [r.p3, r.k3]].forEach(([p, k]) => {
+      if (p && k && p.startsWith(who)) items.push({ t: TECHS.find(([, f]) => p.endsWith(f))[1], k });
+    }));
+    if (!items.length) return '';
+    const byT = {};
+    items.forEach(({ t, k }) => { (byT[t] = byT[t] || {})[k] = (byT[t][k] || 0) + 1; });
+    const rows = Object.entries(byT).map(([t, m]) => [t, Object.entries(m).sort((a, b) => b[1] - a[1]), Object.values(m).reduce((a, b) => a + b, 0)])
+      .sort((a, b) => b[2] - a[2]);
+    let max = 0, tops = [];
+    rows.forEach(([t, ks]) => ks.forEach(([k, n]) => { if (n > max) { max = n; tops = []; } if (n === max) tops.push(k + t); }));
+    const oji = items.filter(x => OJI.includes(x.k)).length, shi = items.length - oji;
+    const ratio = showRatio ? `<div style="font-size:13px;font-weight:700">しかけ技と応じ技の割合</div>
+      <div class="kind2">${shi ? `<span style="width:${shi / items.length * 100}%;background:${color}">しかけ ${shi}本（${Math.round(shi / items.length * 100)}%）</span>` : ''}${oji ? `<span style="width:${oji / items.length * 100}%;background:#d98a84">応じ ${oji}本</span>` : ''}</div>` : '';
+    return `<div class="card"><div class="dh"><h3 style="color:${color}">${title}</h3><small>種類を入れた ${items.length}本</small></div>${ratio}
+      <table class="ktb">${rows.map(([t, ks]) => `<tr><td class="k">${t}</td><td>${ks.map(([k, n]) => `<span class="kp" style="background:${bg};color:${color}">${esc(k)} ${n}</span>`).join('')}</td></tr>`).join('')}</table>
+      <p class="note">いちばん多いのは<b style="color:${color}">${tops.map(esc).join('・')}</b>（${max}本）</p></div>`;
+  }
+
   // 個人の詳細：技ごとの割合（個人戦・団体戦の両方を含む）
   function renderDetail() {
     const nm = $('sName').value;
@@ -529,6 +571,8 @@
         <p class="hint" style="text-align:center;margin:8px 0 0">個人戦 ${mine.length - nTeam}試合・団体戦 ${nTeam}試合</p></div>
       ${block('自分', '取った技', 'var(--win)')}
       ${block('相手', '取られた技', 'var(--lose)')}
+      ${kindCard(mine, '自分', '取った技の中身', 'var(--win)', '#fdecea', true)}
+      ${kindCard(mine, '相手', '取られた技の中身', 'var(--lose)', '#e9eef9', false)}
       <div class="card"><div class="dh" style="margin:0"><h3>反則（▲）</h3>
         <small>${(() => { const f = mine.reduce((a, r) => a + (+r.foulMe || 0), 0);
           return `合計 <b style="font-size:16px;color:var(--ink)">${f}回</b>（1試合あたり ${mine.length ? (f / mine.length).toFixed(1) : 0}回）`; })()}</small></div></div>

@@ -168,6 +168,23 @@ details.day .ds span{background:#fff;border-radius:4px;padding:0 4px;font-weight
 .linkbtn{background:none;border:none;color:var(--sub);text-decoration:underline;font-size:12px;font-family:inherit;padding:4px}
 .rec.team{border-left-color:var(--ai);padding:10px}
 .rec.team.win{border-left-color:var(--win)} .rec.team.lose{border-left-color:var(--lose)}
+/* 技の種類 */
+.seq .p small{font-size:11px;font-weight:400}
+.kindbox:empty{display:none}
+.kindbox{background:#faf7f0;border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin:6px 0 4px}
+.kindbox .kq{font-size:13px;font-weight:700;margin-bottom:4px}
+.kindbox .kq span{font-weight:400;color:var(--sub);font-size:12px}
+.kindbox .kg{font-size:11px;color:var(--sub);margin:6px 0 4px}
+.subchips{display:flex;flex-wrap:wrap;gap:6px}
+.subchips .chip{padding:6px 10px;font-size:14px}
+.subchips.me .chip.on{background:var(--win);border-color:var(--win)}
+.subchips.op .chip.on{background:var(--lose);border-color:var(--lose)}
+.kind2{display:flex;height:24px;border-radius:5px;overflow:hidden;margin:4px 0 6px}
+.kind2 span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden}
+.ktb{width:100%;border-collapse:collapse;font-size:14px}
+.ktb td{padding:6px 2px;border-bottom:1px solid var(--line);text-align:left}
+.ktb td.k{font-weight:700;width:52px}
+.ktb .kp{display:inline-block;border-radius:4px;padding:1px 6px;margin:2px 4px 2px 0;font-size:13px}
 .lock{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .lock .card{width:100%;max-width:380px;text-align:center}
 .lock h2{margin:4px 0 6px;font-size:20px;color:var(--ai)}
